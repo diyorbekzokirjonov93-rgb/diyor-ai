@@ -97,7 +97,7 @@ function Chat({ activeChat, onUpdateChat }) {
 
     try {
       const response = await fetch(
-        "http://localhost:3002/api/chat",
+        "https://diyor-ai-server.onrender.com/api/chat",
         {
           method: "POST",
           headers: {

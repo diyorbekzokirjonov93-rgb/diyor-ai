@@ -83,9 +83,9 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-const PORT = 3002;
+const PORT = process.env.PORT || 3002;
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`DiyorAI server http://localhost:${PORT} da ishlayapti`);
 });
 

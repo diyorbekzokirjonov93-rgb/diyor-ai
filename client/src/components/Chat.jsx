@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 
 function Chat({ activeChat, onUpdateChat }) {
@@ -6,6 +5,7 @@ function Chat({ activeChat, onUpdateChat }) {
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [loading, setLoading] = useState(false);
+  const [imageEditMode, setImageEditMode] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
   const messagesRef = useRef(null);
@@ -54,6 +54,7 @@ function Chat({ activeChat, onUpdateChat }) {
   const removeImage = () => {
     setImage(null);
     setImagePreview("");
+    setImageEditMode(false);
   };
 
   const sendMessage = async () => {
@@ -63,9 +64,17 @@ function Chat({ activeChat, onUpdateChat }) {
       return;
     }
 
+    if (imageEditMode && !image) {
+      alert("Avval rasm tanlang.");
+      return;
+    }
+
     const userMessage = {
       id: Date.now(),
-      text: text || "Rasm yuborildi",
+      text:
+        imageEditMode
+          ? text || "Rasmni o‘zgartirish"
+          : text || "Rasm yuborildi",
       image: imagePreview || null,
       sender: "user",
     };
@@ -80,7 +89,10 @@ function Chat({ activeChat, onUpdateChat }) {
       messages,
       title:
         activeChat.messages?.length === 0
-          ? text.slice(0, 35) || "Rasm"
+          ? text.slice(0, 35) ||
+            (imageEditMode
+              ? "Rasmni o‘zgartirish"
+              : "Rasm")
           : activeChat.title,
     };
 
@@ -96,19 +108,28 @@ function Chat({ activeChat, onUpdateChat }) {
     }
 
     try {
-      const response = await fetch(
-        "https://diyor-ai-server.onrender.com/api/chat",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+     const endpoint = isImageEdit
+  ? "https://diyor-ai-server.onrender.com/api/image-edit"
+  : isImageGenerate
+  ? "https://diyor-ai-server.onrender.com/api/image-generate"
+  : "https://diyor-ai-server.onrender.com/api/chat";
+      const body = imageEditMode
+        ? {
+            image: imagePreview,
+            prompt: text,
+          }
+        : {
             message: text,
             image: imagePreview || null,
-          }),
-        }
-      );
+          };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
       const data = await response.json();
 
@@ -118,11 +139,18 @@ function Chat({ activeChat, onUpdateChat }) {
         );
       }
 
-      const aiMessage = {
-        id: Date.now() + 1,
-        text: data.answer,
-        sender: "ai",
-      };
+      const aiMessage = imageEditMode
+        ? {
+            id: Date.now() + 1,
+            text: "Mana, rasmni o‘zgartirdim 🎨",
+            image: data.image,
+            sender: "ai",
+          }
+        : {
+            id: Date.now() + 1,
+            text: data.answer,
+            sender: "ai",
+          };
 
       onUpdateChat({
         ...userChat,
@@ -145,6 +173,7 @@ function Chat({ activeChat, onUpdateChat }) {
       });
     } finally {
       setLoading(false);
+      setImageEditMode(false);
     }
   };
 
@@ -224,7 +253,7 @@ function Chat({ activeChat, onUpdateChat }) {
                 {msg.image && (
                   <img
                     src={msg.image}
-                    alt="Yuborilgan rasm"
+                    alt="Rasm"
                     className="sent-image"
                   />
                 )}
@@ -235,23 +264,24 @@ function Chat({ activeChat, onUpdateChat }) {
                   </div>
                 )}
 
-                {msg.sender === "ai" && (
-                  <div className="message-actions">
-                    <button
-                      className="copy-message-btn"
-                      onClick={() =>
-                        copyMessage(
-                          msg.text,
-                          msg.id
-                        )
-                      }
-                    >
-                      {copiedId === msg.id
-                        ? "✓ Nusxalandi"
-                        : "📋 Nusxalash"}
-                    </button>
-                  </div>
-                )}
+                {msg.sender === "ai" &&
+                  msg.text && (
+                    <div className="message-actions">
+                      <button
+                        className="copy-message-btn"
+                        onClick={() =>
+                          copyMessage(
+                            msg.text,
+                            msg.id
+                          )
+                        }
+                      >
+                        {copiedId === msg.id
+                          ? "✓ Nusxalandi"
+                          : "📋 Nusxalash"}
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
           ))}
@@ -296,6 +326,24 @@ function Chat({ activeChat, onUpdateChat }) {
           </div>
         )}
 
+        {imagePreview && (
+          <button
+            type="button"
+            className={`image-edit-mode-btn ${
+              imageEditMode ? "active" : ""
+            }`}
+            onClick={() =>
+              setImageEditMode((prev) => !prev)
+            }
+            disabled={loading}
+          >
+            🎨{" "}
+            {imageEditMode
+              ? "Rasm o‘zgartirish yoqilgan"
+              : "Rasmni o‘zgartirish"}
+          </button>
+        )}
+
         <div className="chat-input-area">
           <input
             ref={fileInputRef}
@@ -322,7 +370,11 @@ function Chat({ activeChat, onUpdateChat }) {
             value={message}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="DiyorAI'ga yozing..."
+            placeholder={
+              imageEditMode
+                ? "Rasmni qanday o‘zgartiray?"
+                : "DiyorAI'ga yozing..."
+            }
             rows="1"
             disabled={loading}
           />
@@ -341,7 +393,9 @@ function Chat({ activeChat, onUpdateChat }) {
         </div>
 
         <div className="input-info">
-          Enter — yuborish · Rasm yuborish uchun + tugmasini bosing
+          {imageEditMode
+            ? "Masalan: fonini o‘zgartir yoki cartoon qilib ber"
+            : "Enter — yuborish · Rasm yuborish uchun + tugmasini bosing"}
         </div>
       </div>
     </main>

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 
 function Chat({ activeChat, onUpdateChat }) {
@@ -114,6 +113,63 @@ function Chat({ activeChat, onUpdateChat }) {
     }
 
     try {
+      const normalizedText = text
+        .toLowerCase()
+        .replace(/[-–—]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const isVideoRequest =
+        normalizedText.includes("video") ||
+        normalizedText.includes("videolar") ||
+        normalizedText.includes("youtube");
+
+      if (
+        !imageEditMode &&
+        !imageGenerateMode &&
+        isVideoRequest
+      ) {
+        const response = await fetch(
+          "http://localhost:3002/api/videos",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query: text,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Video qidirishda xatolik"
+          );
+        }
+
+        const aiMessage = {
+          id: Date.now() + 1,
+          text:
+            "Mana, siz uchun 5 ta video topdim 🎬",
+          videos: data.videos || [],
+          sender: "ai",
+        };
+
+        onUpdateChat({
+          ...userChat,
+          messages: [
+            ...messages,
+            aiMessage,
+          ],
+        });
+
+        return;
+      }
+
       const endpoint = imageEditMode
         ? "https://diyor-ai-server.onrender.com/api/image-edit"
         : imageGenerateMode
@@ -168,7 +224,10 @@ function Chat({ activeChat, onUpdateChat }) {
 
       onUpdateChat({
         ...userChat,
-        messages: [...messages, aiMessage],
+        messages: [
+          ...messages,
+          aiMessage,
+        ],
       });
     } catch (error) {
       console.error(error);
@@ -183,7 +242,10 @@ function Chat({ activeChat, onUpdateChat }) {
 
       onUpdateChat({
         ...userChat,
-        messages: [...messages, aiMessage],
+        messages: [
+          ...messages,
+          aiMessage,
+        ],
       });
     } finally {
       setLoading(false);
@@ -255,7 +317,9 @@ function Chat({ activeChat, onUpdateChat }) {
               }`}
             >
               <div className="message-avatar">
-                {msg.sender === "user" ? "Siz" : "D"}
+                {msg.sender === "user"
+                  ? "Siz"
+                  : "D"}
               </div>
 
               <div className="message-content">
@@ -276,6 +340,35 @@ function Chat({ activeChat, onUpdateChat }) {
                 {msg.text && (
                   <div className="message-text">
                     {msg.text}
+                  </div>
+                )}
+
+                {msg.videos?.length > 0 && (
+                  <div className="video-results">
+                    {msg.videos.map((video) => (
+                      <a
+                        key={video.id}
+                        href={video.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="video-card"
+                      >
+                        <img
+                          src={video.thumbnail}
+                          alt={video.title}
+                        />
+
+                        <div className="video-info">
+                          <h4>
+                            {video.title}
+                          </h4>
+
+                          <p>
+                            {video.channel}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
                   </div>
                 )}
 
@@ -348,7 +441,9 @@ function Chat({ activeChat, onUpdateChat }) {
               imageEditMode ? "active" : ""
             }`}
             onClick={() => {
-              setImageEditMode((prev) => !prev);
+              setImageEditMode(
+                (prev) => !prev
+              );
               setImageGenerateMode(false);
             }}
             disabled={loading}
@@ -366,7 +461,9 @@ function Chat({ activeChat, onUpdateChat }) {
             imageGenerateMode ? "active" : ""
           }`}
           onClick={() => {
-            setImageGenerateMode((prev) => !prev);
+            setImageGenerateMode(
+              (prev) => !prev
+            );
             setImageEditMode(false);
             setImage(null);
             setImagePreview("");

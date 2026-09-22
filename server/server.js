@@ -16,9 +16,15 @@ app.use(
 );
 
 const apiKey = process.env.OPENROUTER_API_KEY;
+const rapidApiKey = process.env.RAPIDAPI_KEY;
 
 if (!apiKey) {
   console.error("OPENROUTER_API_KEY topilmadi!");
+  process.exit(1);
+}
+
+if (!rapidApiKey) {
+  console.error("RAPIDAPI_KEY topilmadi!");
   process.exit(1);
 }
 
@@ -51,6 +57,24 @@ app.post("/api/chat", async (req, res) => {
       });
     }
 
+    const userMessage = message.trim();
+
+    const normalizedMessage = userMessage
+      .toLowerCase()
+      .replace(/[-–—]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (
+      normalizedMessage === "diyor zokirov" ||
+      normalizedMessage.includes("diyor zokirov")
+    ) {
+      return res.json({
+        answer:
+          "Diyor-Zokirov — meni, DiyorAI'ni kodlashtirgan va yaratilishimda yordam bergan shaxs. Shu sababli men DiyorAI, Diyor-Zokirovning AI yordamchisiman. 🤖"
+      });
+    }
+
     const completion =
       await client.chat.completions.create({
         model: "openai/gpt-oss-120b",
@@ -63,7 +87,7 @@ app.post("/api/chat", async (req, res) => {
           },
           {
             role: "user",
-            content: message
+            content: userMessage
           }
         ]
       });
@@ -99,6 +123,134 @@ app.post("/api/chat", async (req, res) => {
 
     res.status(500).json({
       error: errorMessage
+    });
+  }
+});
+
+
+/* =========================
+   VIDEO SEARCH
+========================= */
+
+app.post("/api/videos", async (req, res) => {
+  try {
+    const { query } = req.body;
+
+    if (!query || !query.trim()) {
+      return res.status(400).json({
+        error: "Video qidiruv so‘rovi kiritilmagan"
+      });
+    }
+
+    console.log(
+      "VIDEO SEARCH:",
+      query
+    );
+
+    const url = new URL(
+      "https://youtube-v311.p.rapidapi.com/search/"
+    );
+
+    url.searchParams.set(
+      "part",
+      "snippet"
+    );
+
+    url.searchParams.set(
+      "q",
+      query.trim()
+    );
+
+    url.searchParams.set(
+      "type",
+      "video"
+    );
+
+    url.searchParams.set(
+      "maxResults",
+      "5"
+    );
+
+    url.searchParams.set(
+      "regionCode",
+      "UZ"
+    );
+
+    const response =
+      await fetch(url, {
+        method: "GET",
+
+        headers: {
+          "x-rapidapi-host":
+            "youtube-v311.p.rapidapi.com",
+
+          "x-rapidapi-key":
+            rapidApiKey
+        }
+      });
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      console.error(
+        "RAPIDAPI VIDEO ERROR:",
+        data
+      );
+
+      return res.status(
+        response.status
+      ).json({
+        error:
+          data?.message ||
+          data?.error ||
+          "RapidAPI orqali YouTube qidiruvida xatolik"
+      });
+    }
+
+    const videos =
+      (data.items || [])
+        .filter(
+          (item) =>
+            item.id?.videoId
+        )
+        .map(
+          (item) => ({
+            id:
+              item.id.videoId,
+
+            title:
+              item.snippet?.title ||
+              "Nomsiz video",
+
+            channel:
+              item.snippet?.channelTitle ||
+              "Noma'lum kanal",
+
+            thumbnail:
+              item.snippet?.thumbnails?.medium?.url ||
+              item.snippet?.thumbnails?.default?.url,
+
+            url:
+              `https://www.youtube.com/watch?v=${item.id.videoId}`
+          })
+        );
+
+    res.json({
+      success: true,
+      videos
+    });
+
+  } catch (error) {
+    console.error(
+      "VIDEO SEARCH ERROR:",
+      error
+    );
+
+    res.status(500).json({
+      error:
+        error?.message ||
+        "Videolarni olishda xatolik yuz berdi"
     });
   }
 });

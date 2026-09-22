@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 
 function Chat({ activeChat, onUpdateChat }) {
@@ -6,6 +7,7 @@ function Chat({ activeChat, onUpdateChat }) {
   const [imagePreview, setImagePreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [imageEditMode, setImageEditMode] = useState(false);
+  const [imageGenerateMode, setImageGenerateMode] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
   const messagesRef = useRef(null);
@@ -74,6 +76,8 @@ function Chat({ activeChat, onUpdateChat }) {
       text:
         imageEditMode
           ? text || "Rasmni o‘zgartirish"
+          : imageGenerateMode
+          ? text || "Rasm yaratish"
           : text || "Rasm yuborildi",
       image: imagePreview || null,
       sender: "user",
@@ -92,6 +96,8 @@ function Chat({ activeChat, onUpdateChat }) {
           ? text.slice(0, 35) ||
             (imageEditMode
               ? "Rasmni o‘zgartirish"
+              : imageGenerateMode
+              ? "Rasm yaratish"
               : "Rasm")
           : activeChat.title,
     };
@@ -108,14 +114,19 @@ function Chat({ activeChat, onUpdateChat }) {
     }
 
     try {
-     const endpoint = isImageEdit
-  ? "https://diyor-ai-server.onrender.com/api/image-edit"
-  : isImageGenerate
-  ? "https://diyor-ai-server.onrender.com/api/image-generate"
-  : "https://diyor-ai-server.onrender.com/api/chat";
+      const endpoint = imageEditMode
+        ? "https://diyor-ai-server.onrender.com/api/image-edit"
+        : imageGenerateMode
+        ? "https://diyor-ai-server.onrender.com/api/image-generate"
+        : "https://diyor-ai-server.onrender.com/api/chat";
+
       const body = imageEditMode
         ? {
             image: imagePreview,
+            prompt: text,
+          }
+        : imageGenerateMode
+        ? {
             prompt: text,
           }
         : {
@@ -139,18 +150,21 @@ function Chat({ activeChat, onUpdateChat }) {
         );
       }
 
-      const aiMessage = imageEditMode
-        ? {
-            id: Date.now() + 1,
-            text: "Mana, rasmni o‘zgartirdim 🎨",
-            image: data.image,
-            sender: "ai",
-          }
-        : {
-            id: Date.now() + 1,
-            text: data.answer,
-            sender: "ai",
-          };
+      const aiMessage =
+        imageEditMode || imageGenerateMode
+          ? {
+              id: Date.now() + 1,
+              text: imageEditMode
+                ? "Mana, rasmni o‘zgartirdim 🎨"
+                : "Mana, rasmni yaratdim ✨",
+              image: data.image,
+              sender: "ai",
+            }
+          : {
+              id: Date.now() + 1,
+              text: data.answer,
+              sender: "ai",
+            };
 
       onUpdateChat({
         ...userChat,
@@ -174,6 +188,7 @@ function Chat({ activeChat, onUpdateChat }) {
     } finally {
       setLoading(false);
       setImageEditMode(false);
+      setImageGenerateMode(false);
     }
   };
 
@@ -332,9 +347,10 @@ function Chat({ activeChat, onUpdateChat }) {
             className={`image-edit-mode-btn ${
               imageEditMode ? "active" : ""
             }`}
-            onClick={() =>
-              setImageEditMode((prev) => !prev)
-            }
+            onClick={() => {
+              setImageEditMode((prev) => !prev);
+              setImageGenerateMode(false);
+            }}
             disabled={loading}
           >
             🎨{" "}
@@ -343,6 +359,25 @@ function Chat({ activeChat, onUpdateChat }) {
               : "Rasmni o‘zgartirish"}
           </button>
         )}
+
+        <button
+          type="button"
+          className={`image-generate-mode-btn ${
+            imageGenerateMode ? "active" : ""
+          }`}
+          onClick={() => {
+            setImageGenerateMode((prev) => !prev);
+            setImageEditMode(false);
+            setImage(null);
+            setImagePreview("");
+          }}
+          disabled={loading}
+        >
+          ✨{" "}
+          {imageGenerateMode
+            ? "Rasm yaratish yoqilgan"
+            : "Rasm yaratish"}
+        </button>
 
         <div className="chat-input-area">
           <input
@@ -373,6 +408,8 @@ function Chat({ activeChat, onUpdateChat }) {
             placeholder={
               imageEditMode
                 ? "Rasmni qanday o‘zgartiray?"
+                : imageGenerateMode
+                ? "Qanday rasm yaratish kerak?"
                 : "DiyorAI'ga yozing..."
             }
             rows="1"
@@ -395,6 +432,8 @@ function Chat({ activeChat, onUpdateChat }) {
         <div className="input-info">
           {imageEditMode
             ? "Masalan: fonini o‘zgartir yoki cartoon qilib ber"
+            : imageGenerateMode
+            ? "Masalan: Toshkent shahri futuristik ko‘rinishda"
             : "Enter — yuborish · Rasm yuborish uchun + tugmasini bosing"}
         </div>
       </div>
